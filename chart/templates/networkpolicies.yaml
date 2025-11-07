@@ -1,149 +1,5 @@
-# 🔒 1️⃣ Bloquea todo por defecto (Ingress y Egress)
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: default-deny-all
-spec:
-  podSelector: {}
-  policyTypes:
-    - Ingress
-    - Egress
 ---
-# 🌐 2️⃣ Permitir tráfico DNS (resolución de nombres)
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-dns
-spec:
-  podSelector: {}  # Aplica a todos los pods del namespace
-  policyTypes:
-    - Egress
-  egress:
-    - ports:
-        - protocol: UDP
-          port: 53
----
-# 💻 3️⃣ El frontend puede llamar al backend-api
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-frontend-to-api
-spec:
-  podSelector:
-    matchLabels:
-      app: backend-api
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app: frontend
-      ports:
-        - protocol: TCP
-          port: 8080
----
-# 💻 4️⃣ Permitir salida del frontend hacia el backend-api
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-egress-api
-spec:
-  podSelector:
-    matchLabels:
-      app: frontend
-  policyTypes:
-    - Egress
-  egress:
-    - to:
-        - podSelector:
-            matchLabels:
-              app: backend-api
-      ports:
-        - protocol: TCP
-          port: 8080
----
-# 🔄 5️⃣ El backend-api puede llamar al backend-data
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-api-to-data
-spec:
-  podSelector:
-    matchLabels:
-      app: backend-data
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app: backend-api
-      ports:
-        - protocol: TCP
-          port: 8081
----
-# 🔄 6️⃣ Permitir salida del backend-api hacia backend-data
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-egress-api-to-data
-spec:
-  podSelector:
-    matchLabels:
-      app: backend-api
-  policyTypes:
-    - Egress
-  egress:
-    - to:
-        - podSelector:
-            matchLabels:
-              app: backend-data
-      ports:
-        - protocol: TCP
-          port: 8081
----
-# 🧩 7️⃣ El backend-data puede llamar a MongoDB
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-data-to-mongodb
-spec:
-  podSelector:
-    matchLabels:
-      app: mongodb
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app: backend-data
-      ports:
-        - protocol: TCP
-          port: 27017
----
-# 🧩 8️⃣ Permitir salida de backend-data hacia MongoDB
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-egress-data-to-db
-spec:
-  podSelector:
-    matchLabels:
-      app: backend-data
-  policyTypes:
-    - Egress
-  egress:
-    - to:
-        - podSelector:
-            matchLabels:
-              app: mongodb
-      ports:
-        - protocol: TCP
-          port: 27017
----
-# 🧪 9️⃣ Permitir salida de pods de prueba (curlpod, dnsutils, etc.)
+# 🧪 Permite que pods de prueba (como curlpod) puedan salir
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -156,4 +12,20 @@ spec:
     - Egress
   egress:
     - to:
-        - namespaceSelector: {}  # puede acceder a cualquier namespace
+        - namespaceSelector: {}
+
+---
+# 🧪 Permite que pods de prueba (como curlpod) puedan ingresar a los demás pods del namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-test-tools
+spec:
+  podSelector: {}  # aplica a todos los pods destino
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              run: curlpod
