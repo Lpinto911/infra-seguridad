@@ -1,4 +1,73 @@
-# backend-api puede llamar a backend-data
+# 🔒 Bloqueo por defecto de todo el tráfico
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# 🌐 El frontend puede llamar al backend-api (ingress + egress)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-to-api
+spec:
+  podSelector:
+    matchLabels:
+      app: backend-api
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: frontend
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-api
+spec:
+  podSelector:
+    matchLabels:
+      app: frontend
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: backend-api
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# 🔄 backend-api puede llamar a backend-data
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-api-to-data
+spec:
+  podSelector:
+    matchLabels:
+      app: backend-data
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: backend-api
+      ports:
+        - protocol: TCP
+          port: 8081
+---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -18,7 +87,26 @@ spec:
         - protocol: TCP
           port: 8081
 ---
-# backend-data puede llamar a mongodb
+# 🧩 backend-data puede llamar a mongodb
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-data-to-mongodb
+spec:
+  podSelector:
+    matchLabels:
+      app: mongodb
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: backend-data
+      ports:
+        - protocol: TCP
+          port: 27017
+---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -38,7 +126,7 @@ spec:
         - protocol: TCP
           port: 27017
 ---
-# (opcional) curlpod o pods temporales pueden salir al namespace
+# 🧪 Permite que pods de prueba (como curlpod) puedan salir
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
