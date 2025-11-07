@@ -8,23 +8,58 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      NAMESPACE: lpintofsgrp-dev
+      CHART_PATH: ./chart
+      RELEASE_NAME: infra-seguridad
+
     steps:
+      # 🧩 1️⃣ Clonar el repositorio
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 🧰 2️⃣ Instalar OC CLI (cliente de OpenShift)
       - name: Install OC CLI
         run: |
           curl -L https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz | tar xz
           sudo mv oc /usr/local/bin/
-          oc version
+          oc version --client
 
-      - name: Log in Openshift
+      # 🔑 3️⃣ Autenticación en OpenShift
+      - name: Log in to OpenShift
         uses: redhat-actions/oc-login@v1
         with:
           openshift_server_url: ${{ secrets.OPENSHIFT_SERVER }}
           openshift_token: ${{ secrets.OPENSHIFT_TOKEN }}
+          insecure_skip_tls_verify: true  # ⚠️ quitar si usas certificados válidos
 
-      - name: Apply networkpolicies via helm (local chart)
+      # 🏗️ 4️⃣ Asegurar que el namespace exista
+      - name: Ensure project exists
         run: |
-          oc project lpintofsgrp-dev || oc new-project lpintofsgrp-dev
-          helm upgrade --install infra-seguridad ./chart -n lpintofsgrp-dev --wait --timeout 5m
+          oc get project $NAMESPACE || oc new-project $NAMESPACE
+          echo "✅ Namespace listo: $NAMESPACE"
+
+      # ⚙️ 5️⃣ Instalar Helm (por si la runner no lo tiene)
+      - name: Install Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          helm version
+
+      # 🚀 6️⃣ Aplicar las NetworkPolicies vía Helm
+      - name: Deploy NetworkPolicies via Helm
+        run: |
+          helm upgrade --install $RELEASE_NAME $CHART_PATH \
+            -n $NAMESPACE \
+            --wait --timeout 5m \
+            --atomic \
+            --set appNamespace=$NAMESPACE
+          echo "✅ NetworkPolicies desplegadas con éxito"
+
+      # 🔎 7️⃣ Validar despliegue
+      - name: Verify NetworkPolicies
+        run: |
+          echo "🔍 Políticas aplicadas:"
+          oc get networkpolicy -n $NAMESPACE
+          echo
+          echo "🔍 Revisión del release Helm:"
+          helm status $RELEASE_NAME -n $NAMESPACE
