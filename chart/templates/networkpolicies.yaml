@@ -1,29 +1,52 @@
 ---
-# 1️⃣ Frontend: permite tráfico externo (OpenShift Router)
+# 1️⃣ Permitir que los pods de prueba (curlpod) puedan hacer pruebas de red
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-external-to-frontend
+  name: allow-egress-test-tools
   namespace: lpintofsgrp-dev
 spec:
   podSelector:
     matchLabels:
-      app: frontend
+      run: curlpod
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector: {} # permite salir a cualquier namespace
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 8081
+        - protocol: TCP
+          port: 5432
+
+---
+# 2️⃣ Permitir que los pods curlpod puedan ser accedidos para pruebas
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-test-tools
+  namespace: lpintofsgrp-dev
+spec:
+  podSelector: {}
   policyTypes:
     - Ingress
   ingress:
     - from:
-        - namespaceSelector: {}  # todo el cluster, o puedes filtrar al namespace del router
-      ports:
-        - protocol: TCP
-          port: 80
+        - podSelector:
+            matchLabels:
+              run: curlpod
 
 ---
-# 2️⃣ Backend API: permite tráfico desde frontend y salida hacia backend-data
+# 3️⃣ Permitir que el FRONTEND se comunique con el BACKEND-API
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-frontend-to-backend
+  name: allow-frontend-to-backend-api
   namespace: lpintofsgrp-dev
 spec:
   podSelector:
@@ -31,7 +54,6 @@ spec:
       app: backend-api
   policyTypes:
     - Ingress
-    - Egress
   ingress:
     - from:
         - podSelector:
@@ -40,21 +62,13 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
-  egress:
-    - to:
-        - podSelector:
-            matchLabels:
-              app: backend-data
-      ports:
-        - protocol: TCP
-          port: 8081
 
 ---
-# 3️⃣ Backend Data: recibe solo del backend-api y puede conectarse a PostgreSQL
+# 4️⃣ Permitir que el BACKEND-API se comunique con el BACKEND-DATA
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-backend-to-backenddata
+  name: allow-backend-api-to-backend-data
   namespace: lpintofsgrp-dev
 spec:
   podSelector:
@@ -62,7 +76,6 @@ spec:
       app: backend-data
   policyTypes:
     - Ingress
-    - Egress
   ingress:
     - from:
         - podSelector:
@@ -71,26 +84,18 @@ spec:
       ports:
         - protocol: TCP
           port: 8081
-  egress:
-    - to:
-        - podSelector:
-            matchLabels:
-              app: postgresql
-      ports:
-        - protocol: TCP
-          port: 5432
 
 ---
-# 4️⃣ PostgreSQL: solo permite tráfico desde backend-data
+# 5️⃣ Permitir que el BACKEND-DATA se comunique con POSTGRES
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-backenddata-to-postgres
+  name: allow-backend-data-to-postgres
   namespace: lpintofsgrp-dev
 spec:
   podSelector:
     matchLabels:
-      app: postgresql
+      app: postgres
   policyTypes:
     - Ingress
   ingress:
